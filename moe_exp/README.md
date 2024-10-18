@@ -98,28 +98,28 @@ Built on Tue_Feb_27_16:19:38_PST_2024
 Cuda compilation tools, release 12.4, V12.4.99
 Build cuda_12.4.r12.4/compiler.33961263_0
 2.4.0+cu121
-<module 'apex' from '/home/nsml/.local/lib/python3.10/site-packages/apex/__init__.py'>
-<module 'transformer_engine' from '/home/nsml/.local/lib/python3.10/site-packages/transformer_engine/__init__.py'>
+<module 'apex' from '/workspace/.local/lib/python3.10/site-packages/apex/__init__.py'>
+<module 'transformer_engine' from '/workspace/.local/lib/python3.10/site-packages/transformer_engine/__init__.py'>
 <class 'transformer_engine.pytorch.module.linear.Linear'>
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:22: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:22: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
   def forward(ctx: Any, x: torch.Tensor, scale: float):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:28: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:28: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
   def backward(ctx: torch.Tensor, grad: torch.Tensor):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:192: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:192: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
   def forward(ctx, x, w1, w2, topo, activation_fn):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:234: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:234: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
   def backward(ctx, ddsd_out):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:402: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:402: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
   def forward(ctx, x, w1, w2, batch_sizes, activation_fn):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:435: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/mlp.py:435: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
   def backward(ctx: Any, ddsd_out: torch.Tensor):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/glu.py:71: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/glu.py:71: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
   def forward(ctx, x, w1, v1, w2, batch_sizes, activation_fn):
-/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/glu.py:106: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+/workspace/.local/lib/python3.10/site-packages/megablocks/layers/glu.py:106: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
   def backward(ctx, ddsd_out):
-<module 'megablocks' from '/home/nsml/.local/lib/python3.10/site-packages/megablocks/__init__.py'>
-<module 'megablocks.layers.dmoe' from '/home/nsml/.local/lib/python3.10/site-packages/megablocks/layers/dmoe.py'>
-<module 'grouped_gemm' from '/home/nsml/.local/lib/python3.10/site-packages/grouped_gemm/__init__.py'>
+<module 'megablocks' from '/workspace/.local/lib/python3.10/site-packages/megablocks/__init__.py'>
+<module 'megablocks.layers.dmoe' from '/workspace/.local/lib/python3.10/site-packages/megablocks/layers/dmoe.py'>
+<module 'grouped_gemm' from '/workspace/.local/lib/python3.10/site-packages/grouped_gemm/__init__.py'>
 ```
 
 </details>
@@ -312,10 +312,10 @@ e, overlap_param_gather_with_optimizer_step=False, clip_grad=1.0, log_num_zeros_
 INFO:megatron.core.optimizer_param_scheduler:> learning rate decay style: cosine
 WARNING: could not find the metadata file /workspace/checkpoint/megatron/moe/latest_checkpointed_iteration.txt
     will not load any checkpoints and will start from random
-/home/nsml/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py:79: FutureWarning: `torch.distributed._all_gather_base` is a private function and will be deprecated. Please use `torch.distributed.all_ga
+/workspace/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py:79: FutureWarning: `torch.distributed._all_gather_base` is a private function and will be deprecated. Please use `torch.distributed.all_ga
 ther_into_tensor` instead.
   return func(*args, **kwargs)
-/home/nsml/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py:79: FutureWarning: `torch.distributed._all_gather_base` is a private function and will be deprecated. Please use `torch.distributed.all_ga
+/workspace/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py:79: FutureWarning: `torch.distributed._all_gather_base` is a private function and will be deprecated. Please use `torch.distributed.all_ga
 ther_into_tensor` instead.
   return func(*args, **kwargs)
 ```

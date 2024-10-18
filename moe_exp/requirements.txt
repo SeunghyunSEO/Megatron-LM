@@ -1,2 +1,1 @@
-git+https://github.com/fanshiqing/grouped_gemm@v1.1.4
 megablocks==0.6.1

@@ -1,6 +1,6 @@
 # https://github.com/mosaicml/llm-foundry/blob/main/tests/models/layers/test_dmoe.py
 
-
+import os
 import copy
 from contextlib import nullcontext
 from functools import partial
@@ -29,6 +29,24 @@ try:
 except ModuleNotFoundError:
     is_megablocks_imported = False
 
+from pdb import set_trace as Tra
+
+def set_seed(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+def init_dist():
+    rank = int(os.environ["LOCAL_RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
+    print(f"rank: {rank}, world size: {world_size}")
+    return rank, world_size
+
+def print_message_with_master_process(rank, message):
+    if rank==0:
+        print(message)
 
 def _get_all_inputs(
     input_shape: list[int],
@@ -53,8 +71,6 @@ def _get_torch_dtype(fp16: bool, bf16: bool) -> Optional[torch.dtype]:
         return torch.bfloat16
     return None
 
-
-
 def test_dmoe(
     moe_num_experts: int = 8,
     mlp_type: str = 'glu',
@@ -62,6 +78,9 @@ def test_dmoe(
     moe_normalize_expert_weights: Union[float, int] = 1.0,
     two_d_input: bool = False,
 ):
+    assert is_megablocks_imported, "you should install megablocks for comparison"
+    init_dist()
+
     # moe configs
     if moe_world_size > moe_num_experts or moe_num_experts % moe_world_size != 0:
         pytest.skip('Mismatch between moe_world_size and moe_num_experts.')
@@ -111,6 +130,8 @@ def test_dmoe(
         'bf16': bf16,
         'init_method': partial(torch.nn.init.uniform_, a=-1.0, b=1.0),
     }
+
+    # https://pytorch.org/tutorials/recipes/distributed_device_mesh.html
     device_mesh = None
     if moe_world_size > 1:
         world_size = dist.get_world_size()
@@ -124,12 +145,33 @@ def test_dmoe(
         expert_parallel_group = device_mesh['expert_parallel'].get_group(0)
         extra_args.update({
             'moe_expert_model_parallelism': True,
-            'expert_parallel_group': expert_parallel_group,
+            'expert_parallel_group': expert_parallel_group, # https://github.com/databricks/megablocks/blob/7b0337fa7278d224bf0c9be71c3a92c392fdd340/megablocks/layers/moe.py#L278
         },)
     mp_dmoe_args.update(extra_args)
     args = megablocks.layers.arguments.Arguments(**mp_dmoe_args,)
     mb_dmoe = megablocks.layers.dmoe.dMoE(args).to(device)
-    mb_dmoe.router = DDP(mb_dmoe.router, device_ids=[rank])
+    mb_dmoe.router = DDP(
+        mb_dmoe.router, 
+        device_ids=[rank]
+    )
+
+    ## sanity check
+    print_message_with_master_process(rank, f'''
+    common_args: {common_args}
+    torch_dmoe: {torch_dmoe}
+
+    world_size: {world_size}
+    moe_world_size: {moe_world_size}
+    moe_dp_dim: {moe_dp_dim}
+    device_mesh: {device_mesh}
+    expert_parallel_group: {expert_parallel_group}
+    expert_parallel_group.size(): {expert_parallel_group.size()}
+    expert_parallel_group.rank(): {expert_parallel_group.rank()}
+
+    mp_dmoe_args: {mp_dmoe_args}
+    mb_dmoe: {mb_dmoe}
+    mb_dmoe.router: {mb_dmoe.router}
+    ''')
 
     if moe_world_size > 1:
         assert device_mesh is not None
@@ -151,6 +193,12 @@ def test_dmoe(
 
         dp_pg = device_mesh['weight_parallel'].get_group(0)
         mb_dmoe.experts = DDP(mb_dmoe.experts, process_group=dp_pg)
+        print(f'''
+        device_mesh: {device_mesh}
+        device_mesh['weight_parallel']: {device_mesh['weight_parallel']}
+        device_mesh['expert_parallel']: {device_mesh['expert_parallel']}
+        dp_pg: {dp_pg}
+        ''')
 
         # Copy mb_dmoe's parameters to torch_dmoe
         mb_dmoe_state_dict = get_model_state_dict(
@@ -179,6 +227,12 @@ def test_dmoe(
 
     # Run train_step check
     torch_y = torch_dmoe(x)
+    print(f'''
+    rank: {rank}
+    x.size(): {x.size()}
+    x.device: {x.device}
+    torch_y.xise(): {torch_y.size()}
+    ''')
     mb_y = mb_dmoe(x)
 
     torch_y.sum().backward()
@@ -189,3 +243,6 @@ def test_dmoe(
     torch_y = torch_dmoe(x)
     mb_y = mb_dmoe(x)
     torch.testing.assert_close(torch_y, mb_y)
+
+if __name__ == "__main__":
+    test_dmoe()

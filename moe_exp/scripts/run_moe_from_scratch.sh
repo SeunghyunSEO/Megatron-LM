@@ -1,0 +1,30 @@
+MASTER_ADDR="localhost"
+MASTER_PORT=23456
+GPUS_PER_NODE=2
+NNODES=1
+NODE_RANK=0
+
+CHECKPOINT_PATH="/mnt/chatbot30TB/shseo/checkpoint/megatron/moe"
+DATA_PATH="none"
+TOKENIZER_MODEL_PATH="/mnt/chatbot30TB/shseo/ckpt/llama3/meta-llama-3.1-8B"
+TOKENIZER_TYPE="HuggingFaceTokenizer"
+mkdir -p $CHECKPOINT_PATH
+
+NUM_EXPERTS=8
+TOPK=2
+
+TP=1
+PP=1
+EP=2
+
+# USE_MB_DMOE=false
+USE_MB_DMOE=true
+
+./moe_exp/scripts/run_moe.sh \
+$MASTER_ADDR $MASTER_PORT $GPUS_PER_NODE $NNODES $NODE_RANK \
+$CHECKPOINT_PATH $DATA_PATH $TOKENIZER_MODEL_PATH $TOKENIZER_TYPE \
+$NUM_EXPERTS $TOPK \
+$TP $PP $EP \
+$USE_MB_DMOE
+
+

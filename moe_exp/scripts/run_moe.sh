@@ -13,17 +13,19 @@ GPUS_PER_NODE=${3:-8}
 NNODES=${4:-2}
 NODE_RANK=${5:-0}
 
-CHECKPOINT_PATH=${6:-""}
-DATA_PATH=${7:-""}
-TOKENIZER_MODEL_PATH=${8:-""}
-TOKENIZER_TYPE=${9:-""}
+CHECKPOINT_PATH=${6:-"none"}
+DATA_PATH=${7:-"none"}
+TOKENIZER_MODEL_PATH=${8:-"none"}
+TOKENIZER_TYPE=${9:-"none"}
 
 NUM_EXPERTS=${10:-16}
-TOPK=${12:-2}
+TOPK=${11:-2}
 
-TP=${13:-2}
-PP=${14:-2}
-EP=${15:-2}
+TP=${12:-2}
+PP=${13:-2}
+EP=${14:-2}
+
+USE_MB_DMOE=${15:-false}
 
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 DISTRIBUTED_ARGS=(
@@ -61,6 +63,7 @@ MODEL_ARGS=(
     --no-masked-softmax-fusion
     --no-position-embedding
 )
+echo "MODEL_ARGS: ${MODEL_ARGS[@]}"
 
 ## moe model configs
 MOE_ARGS=(
@@ -69,8 +72,12 @@ MOE_ARGS=(
     --moe-router-load-balancing-type aux_loss # options: aux_loss, sinkhorn, None. Default is aux_loss.
     --moe-router-topk ${TOPK}
     --moe-aux-loss-coeff 1e-2
-    --moe-grouped-gemm 
+    --moe-grouped-gemm
 )
+if [ $USE_MB_DMOE = true ]; then
+    MOE_ARGS+=("--moe-use-megablocks-dmoe")
+fi
+echo "MOE_ARGS: ${MOE_ARGS[@]}"
 
 ## distributed training configs
 MODEL_PARALLEL_ARGS=(
@@ -80,23 +87,19 @@ MODEL_PARALLEL_ARGS=(
     --sequence-parallel
     --use-distributed-optimizer
 )
+echo "MODEL_PARALLEL_ARGS: ${MODEL_PARALLEL_ARGS[@]}"
 
 ## data args
 DATA_ARGS=(
-    --tokenizer-type ${TOKENIZER_TYPE}
-    --tokenizer-model ${TOKENIZER_MODEL_PATH}
+    --tokenizer-type "${TOKENIZER_TYPE}"
+    --tokenizer-model "${TOKENIZER_MODEL_PATH}"
 )
-
-if [ -z "${DATA_PATH}" ]; then
-    DATA_ARGS+=(
-        --mock-data
-    )
+if [ "${DATA_PATH}" == "none" ]; then
+    DATA_ARGS+=("--mock-data")
 else
-     DATA_ARGS+=(
-        --data-path ${DATA_PATH}
-        --split 99990,8,2
-     )
+    DATA_ARGS+=("--data-path" "${DATA_PATH}" "--split" "99990,8,2")
 fi
+echo "DATA_ARGS: ${DATA_ARGS[@]}"
 
 ## hparams
 TRAINING_ARGS=(
@@ -113,7 +116,9 @@ TRAINING_ARGS=(
     --bf16
     --overlap-grad-reduce
     --overlap-param-gather
+    --no-gradient-accumulation-fusion # apex version issue
 )
+echo "TRAINING_ARGS: ${TRAINING_ARGS[@]}"
 
 ## logger arguments
 LOGGING_ARGS=(
@@ -133,6 +138,7 @@ if [ -n "${WANDB_API_KEY}" ]; then
         --wandb-exp-name ${WANDB_NAME:-"Mixtral_8x7B"} 
     )
 fi
+echo "LOGGING_ARGS: ${LOGGING_ARGS[@]}"
 
 ## run
 torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \

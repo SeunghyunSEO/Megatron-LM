@@ -23,6 +23,12 @@ from torch.distributed.tensor.parallel import loss_parallel
 from src.model import Transformer
 from transformers import AutoTokenizer
 
+from src.torch_profiler_utils import get_torch_profiler
+
+# from pdb import set_trace as Tra
+from multiprocessing_pdb import MultiprocessingPdb
+Tra = MultiprocessingPdb().set_trace
+
 
 def init_dist():
     rank = int(os.environ["LOCAL_RANK"])

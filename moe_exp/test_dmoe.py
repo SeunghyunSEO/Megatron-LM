@@ -1,4 +1,6 @@
-# https://github.com/mosaicml/llm-foundry/blob/main/tests/models/layers/test_dmoe.py
+'''
+https://github.com/mosaicml/llm-foundry/blob/main/tests/models/layers/test_dmoe.py
+'''
 
 import os
 import copy
@@ -29,7 +31,10 @@ try:
 except ModuleNotFoundError:
     is_megablocks_imported = False
 
-from pdb import set_trace as Tra
+# from pdb import set_trace as Tra
+from multiprocessing_pdb import MultiprocessingPdb
+Tra = MultiprocessingPdb().set_trace
+
 
 def set_seed(seed=1234):
     random.seed(seed)
@@ -79,7 +84,7 @@ def test_dmoe(
     two_d_input: bool = False,
 ):
     assert is_megablocks_imported, "you should install megablocks for comparison"
-    init_dist()
+    rank, world_size = init_dist()
 
     # moe configs
     if moe_world_size > moe_num_experts or moe_num_experts % moe_world_size != 0:

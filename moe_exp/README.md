@@ -17,6 +17,9 @@
         - [moe init](https://github.com/mosaicml/llm-foundry/blob/e6e74a24db234a74010f64f72cbd15bfa4ffda1c/llmfoundry/models/utils/param_init_fns.py#L341-L404)
     - olmo
         - [olmoe](https://github.com/allenai/OLMo/blob/sewon-olmoe/olmo/model.py#L680-L690)
+        - [parallelism](https://github.com/allenai/OLMo/blob/sewon-olmoe/scripts/train.py#L188-L225)
+        - [profiler](https://github.com/allenai/OLMo/blob/sewon-olmoe/olmo/train.py#L1225-L1262)
+
     - megatron integration
         - [megatron PR 1](https://github.com/NVIDIA/Megatron-LM/pull/287)
         - [megatron PR 2](https://github.com/NVIDIA/Megatron-LM/pull/288)
@@ -26,6 +29,7 @@
     - [pytorch/torchtune](https://github.com/pytorch/torchtune)
     - [pytorch/torchtitan](https://github.com/pytorch/torchtitan)
         - [memory_profiler](https://github.com/pytorch/torchtitan/blob/main/docs/memory_profiler.md)
+
 
 ## requirements installation
 
@@ -80,6 +84,14 @@ import grouped_gemm; print(grouped_gemm)"
 ```
 
 ```
+git clone https://github.com/NVIDIA/apex
+cd apex
+pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" ./
+```
+
+<details>
+
+```
 nvcc: NVIDIA (R) Cuda compiler driver
 Copyright (c) 2005-2024 NVIDIA Corporation
 Built on Tue_Feb_27_16:19:38_PST_2024
@@ -110,17 +122,32 @@ Build cuda_12.4.r12.4/compiler.33961263_0
 <module 'grouped_gemm' from '/home/nsml/.local/lib/python3.10/site-packages/grouped_gemm/__init__.py'>
 ```
 
+</details>
 
-```
-git clone https://github.com/NVIDIA/apex
-cd apex
-pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" ./
+## pdb tracer in dist setting
+
+- Installation
+
+```bash
+cd /path/to/dir/multiprocessing_pdb &&\
+pip install -e .
 ```
 
-## run scripts for dmoe test
+- Usage
 
+```python
+from multiprocessing_pdb import MultiprocessingPdb
+Tra = MultiprocessingPdb().set_trace
+
+def dummy_code_block(...):
+    Tra()
 ```
-cd /path/to/dir/Megatron-LM/moe_exp/dmoe_example
+
+
+## run scripts for torch native parallelism
+
+```bash
+cd /path/to/dir/Megatron-LM/moe_exp
 export LOCAL_RANK=0 &&\
 export WORLD_SIZE=2 &&\
 export DP=1 &&\
@@ -132,8 +159,8 @@ torchrun --nproc_per_node=$WORLD_SIZE --master_addr=$MASTER_ADDR --master_port=$
 test_mesh.py
 ```
 
-```
-cd /path/to/dir/Megatron-LM/moe_exp/dmoe_example
+```bash
+cd /path/to/dir/Megatron-LM/moe_exp
 export LOCAL_RANK=0 &&\
 export WORLD_SIZE=2 &&\
 export DP=1 &&\
@@ -146,8 +173,10 @@ test_mesh.py
 ```
 
 
-```
-cd /path/to/dir/Megatron-LM/moe_exp/dmoe_example
+## run scripts for dmoe test
+
+```bash
+cd /path/to/dir/Megatron-LM/moe_exp
 export LOCAL_RANK=0 &&\
 export WORLD_SIZE=2 &&\
 export MASTER_ADDR=node0 &&\
@@ -156,7 +185,8 @@ torchrun --nproc_per_node=$WORLD_SIZE --master_addr=$MASTER_ADDR --master_port=$
 test_dmoe.py
 ```
 
-## run scripts for actual training
+
+## run scripts for megatron integrated dmoe
 
 ```bash
 cd /path/to/dir/Megatron-LM/
@@ -351,6 +381,5 @@ Params for bucket 2 (38474752 elements):
         module.decoder.layers.0.self_attention.linear_qkv.layer_norm_weight
         module.embedding.word_embeddings.weight
 ```
-
 
 </details>

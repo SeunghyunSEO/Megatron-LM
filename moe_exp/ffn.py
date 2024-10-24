@@ -13,7 +13,7 @@ import torch.nn as nn
 from torch.distributed import ProcessGroup
 from torch.distributed._tensor import DeviceMesh, DTensor, Placement, Shard
 
-from src.dmoe import dMoE
+from dmoe import dMoE
 
 try:
     import transformer_engine.pytorch as te

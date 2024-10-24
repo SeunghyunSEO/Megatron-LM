@@ -1,12 +1,14 @@
+'''
+adapted from karpathy
+https://github.com/karpathy/nanoGPT/blob/master/model.py
+'''
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 import torch.nn as nn
 
-'''
-adapted from karpathy
-https://github.com/karpathy/nanoGPT/blob/master/model.py
-'''
+VERBOSE = False
+
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
@@ -118,14 +120,14 @@ class Transformer(nn.Module):
         return F.cross_entropy(z, y, ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, x):
-        print('before wte', x.size())
+        if VERBOSE: print('before wte', x.size())
         x = self.model.wte(x)
-        print('after wte', x.size())
+        if VERBOSE: print('after wte', x.size())
         for block in self.model.h:
             x = block(x, self.freqs_cis)
-            print('after residual block', x.size())
+            if VERBOSE: print('after residual block', x.size())
         x = self.model.ln(x)
-        print('after ln', x.size())
+        if VERBOSE: print('after ln', x.size())
         x = self.lm_head(x).float() # projection to logit space and upcast, (B, T, C)
-        print('after lm_head', x.size())
+        if VERBOSE: print('after lm_head', x.size())
         return x

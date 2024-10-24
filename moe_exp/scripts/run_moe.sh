@@ -13,20 +13,34 @@ GPUS_PER_NODE=${3:-8}
 NNODES=${4:-2}
 NODE_RANK=${5:-0}
 
-CHECKPOINT_PATH=${6:-"none"}
-DATA_PATH=${7:-"none"}
+TRAIN_DATA_PATH=${6:-"none"}
+VALID_DATA_PATH=${7:-"none"}
 TOKENIZER_MODEL_PATH=${8:-"none"}
 TOKENIZER_TYPE=${9:-"none"}
+CHECKPOINT_PATH=${10:-"none"}
 
-NUM_EXPERTS=${10:-16}
-TOPK=${11:-2}
+USE_MOE=${11:-false}
+NUM_EXPERTS=${12:-16}
+TOPK=${13:-2}
+MOE_TYPE=${14:-"dmoe"}
 
-TP=${12:-2}
-PP=${13:-2}
-EP=${14:-2}
+TP=${15:-2}
+PP=${16:-2}
+VPP=${17:-"none"}
+EP=${18:-2}
 
-USE_MB_DMOE=${15:-false}
+# LOG_INTERVAL=${19:-1}
+LOG_INTERVAL=${19:-20}
+SAVE_INTERVAL=${20:-10000}
+EVAL_INTERVAL=${21:-1000}
+EVAL_ITERS=${22:-10}
 
+WANDB_API_KEY=${oc.env:WANDB_API_KEY}
+WANDB_PROJECT=${oc.env:WANDB_PROJECT}
+WANDB_NAME=${oc.env:WANDB_NAME}
+
+
+## dist training configs
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 DISTRIBUTED_ARGS=(
     --nproc_per_node $GPUS_PER_NODE
@@ -35,58 +49,66 @@ DISTRIBUTED_ARGS=(
     --master_addr $MASTER_ADDR
     --master_port $MASTER_PORT
 )
-
-## model/tokenizer/data path
-CHECKPOINT_PATH=${CHECKPOINT_PATH}
-DATA_PATH=${DATA_PATH}
-TOKENIZER_MODEL_PATH=${TOKENIZER_MODEL_PATH}
-TOKENIZER_TYPE=${TOKENIZER_TYPE}
+echo "DISTRIBUTED_ARGS: ${DISTRIBUTED_ARGS[@]}"
 
 ## model configs
 MODEL_ARGS=(
     --disable-bias-linear
-    --seq-length 256
-    --max-position-embeddings 32768
-    --num-layers 4
-    --hidden-size 256
-    --ffn-hidden-size 1024
-    --init-method-std 0.01
-    --attention-dropout 0.0
-    --hidden-dropout 0.0
-    --normalization RMSNorm
+    --seq-length 2048
+    --max-position-embeddings 2048
     --position-embedding-type rope
-    --swiglu
-    --untie-embeddings-and-output-weights
+    --rotary-base 100000
+    --num-layers 32
+    --hidden-size 512
     --num-attention-heads 4
     --group-query-attention
     --num-query-groups 2
-    --no-masked-softmax-fusion
-    --no-position-embedding
+    --ffn-hidden-size 1792
+    --swiglu
+    --normalization RMSNorm
+    --init-method-std 0.02
+    --untie-embeddings-and-output-weights
+    # --no-masked-softmax-fusion
+    --attention-dropout 0.0
+    --hidden-dropout 0.0
 )
 echo "MODEL_ARGS: ${MODEL_ARGS[@]}"
 
 ## moe model configs
-MOE_ARGS=(
-    --num-experts ${NUM_EXPERTS}
-    --expert-model-parallel-size ${EP}
-    --moe-router-load-balancing-type aux_loss # options: aux_loss, sinkhorn, None. Default is aux_loss.
-    --moe-router-topk ${TOPK}
-    --moe-aux-loss-coeff 1e-2
-    --moe-grouped-gemm
-)
-if [ $USE_MB_DMOE = true ]; then
-    MOE_ARGS+=("--moe-use-megablocks-dmoe")
+if [ $USE_MOE = true ]; then
+    MOE_ARGS=(
+        --num-experts ${NUM_EXPERTS}
+        --moe-router-topk ${TOPK}
+        --moe-router-load-balancing-type aux_loss # options: aux_loss, sinkhorn, None. Default is aux_loss.
+        --moe-aux-loss-coeff 1e-2
+        --moe-token-dispatcher-type alltoall
+    )
+    if [ $MOE_TYPE = "moe" ]; then
+        MOE_ARGS+=(
+            --moe-expert-capacity-factor 1.0
+            --moe-pad-expert-input-to-capacity # Optional
+        )
+    elif [ $MOE_TYPE = "dmoe" ]; then
+        MOE_ARGS+=(--moe-grouped-gemm)
+    elif [ $MOE_TYPE = "mb_dmoe" ]; then
+        MOE_ARGS+=(--moe-use-megablocks-dmoe)
+    fi
+    echo "MOE_ARGS: ${MOE_ARGS[@]}"
+else
+    MOE_ARGS=()
 fi
-echo "MOE_ARGS: ${MOE_ARGS[@]}"
 
 ## distributed training configs
 MODEL_PARALLEL_ARGS=(
     --tensor-model-parallel-size ${TP}
     --pipeline-model-parallel-size ${PP}
-    # --num-layers-per-virtual-pipeline-stage # ignore interleaving 
+    --expert-model-parallel-size ${EP}
     --sequence-parallel
     --use-distributed-optimizer
 )
+if [ $VPP != "none" ]; then
+    MODEL_PARALLEL_ARGS+=(--num-layers-per-virtual-pipeline-stage ${VPP})
+fi
 echo "MODEL_PARALLEL_ARGS: ${MODEL_PARALLEL_ARGS[@]}"
 
 ## data args
@@ -94,24 +116,34 @@ DATA_ARGS=(
     --tokenizer-type "${TOKENIZER_TYPE}"
     --tokenizer-model "${TOKENIZER_MODEL_PATH}"
 )
-if [ "${DATA_PATH}" == "none" ]; then
-    DATA_ARGS+=("--mock-data")
+if [ "${TRAIN_DATA_PATH}" == "none" ]; then
+    DATA_ARGS+=(--mock-data)
 else
-    DATA_ARGS+=("--data-path" "${DATA_PATH}" "--split" "99990,8,2")
+    if [ "${VALID_DATA_PATH}" == "none" ]; then
+        DATA_ARGS+=(
+            --data-path ${TRAIN_DATA_PATH} 
+            --split 99990,8,2
+        )
+    else
+        DATA_ARGS+=(
+            --train-data-path ${TRAIN_DATA_PATH} 
+            --valid-data-path ${VALID_DATA_PATH} 
+        )
+    fi
 fi
 echo "DATA_ARGS: ${DATA_ARGS[@]}"
 
 ## hparams
 TRAINING_ARGS=(
     --micro-batch-size 1
-    --global-batch-size 128
-    --lr 1e-4
-    --train-iters 500000
-    --lr-decay-iters 320000
+    --global-batch-size 16
+    --train-iters 50000
+    --lr-decay-iters 48000
+    --lr-warmup-iters 2000
+    --lr 3e-4
+    --min-lr 3e-5
     --lr-decay-style cosine
-    --min-lr 1.0e-5
     --weight-decay 0.1
-    --lr-warmup-iters 500
     --clip-grad 1.0
     --bf16
     --overlap-grad-reduce
@@ -122,20 +154,31 @@ echo "TRAINING_ARGS: ${TRAINING_ARGS[@]}"
 
 ## logger arguments
 LOGGING_ARGS=(
-    --log-interval 1 \
-    --save-interval 10000 \
-    --eval-interval 1000 \
-    --eval-iters 10 \
-    --save $CHECKPOINT_PATH \
-    --load $CHECKPOINT_PATH \
-    --tensorboard-dir "${CHECKPOINT_PATH}/tensorboard" \
-    --no-load-optim \
+    --save $CHECKPOINT_PATH
+    --load $CHECKPOINT_PATH
+    --log-interval ${LOG_INTERVAL}
+    --log-throughput
+    --log-params-norm
+    --log-num-zeros-in-grad
+    --log-progress
+    --save-interval ${SAVE_INTERVAL}
+    --eval-interval ${EVAL_INTERVAL}
+    --eval-iters ${EVAL_ITERS}
+    --tensorboard-dir "${CHECKPOINT_PATH}/tensorboard"
+    --tensorboard-log-interval ${LOG_INTERVAL}
+    --log-timers-to-tensorboard
+    --log-memory-to-tensorboard
+    --log-validation-ppl-to-tensorboard
+    --log-world-size-to-tensorboard
+    # --log-batch-size-to-tensorboard
+    --no-load-optim
     --no-load-rng
 )
+
 if [ -n "${WANDB_API_KEY}" ]; then
     LOGGING_ARGS+=(
-        --wandb-project ${WANDB_PROJECT:-"Mixtral-Finetuning"}
-        --wandb-exp-name ${WANDB_NAME:-"Mixtral_8x7B"} 
+        --wandb-project ${WANDB_PROJECT:-"megatron"}
+        --wandb-exp-name ${WANDB_NAME:-"moe_from_scratch"} 
     )
 fi
 echo "LOGGING_ARGS: ${LOGGING_ARGS[@]}"

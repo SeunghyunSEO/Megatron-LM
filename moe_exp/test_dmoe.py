@@ -4,11 +4,9 @@ https://github.com/mosaicml/llm-foundry/blob/main/tests/models/layers/test_dmoe.
 
 import os
 import copy
-from contextlib import nullcontext
 from functools import partial
 from typing import Optional, Union
 
-import pytest
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
@@ -22,8 +20,15 @@ from torch.distributed.checkpoint.state_dict import (
 from torch.distributed.tensor.parallel.ddp import _pre_dp_module_transform
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from src.dmoe import dMoE
-from src.ffn import dtensorify_param
+from dmoe import dMoE
+from ffn import dtensorify_param
+from utils import (
+    set_seed,
+    init_dist,
+    print_message_with_master_process,
+    _get_torch_dtype,
+    cleanup_distributed,
+)
 
 try:
     import megablocks
@@ -35,23 +40,6 @@ except ModuleNotFoundError:
 from multiprocessing_pdb import MultiprocessingPdb
 Tra = MultiprocessingPdb().set_trace
 
-
-def set_seed(seed=1234):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-def init_dist():
-    rank = int(os.environ["LOCAL_RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
-    dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
-    print(f"rank: {rank}, world size: {world_size}")
-    return rank, world_size
-
-def print_message_with_master_process(rank, message):
-    if rank==0:
-        print(message)
 
 def _get_all_inputs(
     input_shape: list[int],
@@ -69,13 +57,6 @@ def _get_all_inputs(
     ]
     return all_inputs
 
-def _get_torch_dtype(fp16: bool, bf16: bool) -> Optional[torch.dtype]:
-    if fp16:
-        return torch.float16
-    elif bf16:
-        return torch.bfloat16
-    return None
-
 def test_dmoe(
     moe_num_experts: int = 8,
     mlp_type: str = 'glu',
@@ -85,6 +66,7 @@ def test_dmoe(
 ):
     assert is_megablocks_imported, "you should install megablocks for comparison"
     rank, world_size = init_dist()
+    set_seed()
 
     # moe configs
     if moe_world_size > moe_num_experts or moe_num_experts % moe_world_size != 0:
@@ -248,6 +230,7 @@ def test_dmoe(
     torch_y = torch_dmoe(x)
     mb_y = mb_dmoe(x)
     torch.testing.assert_close(torch_y, mb_y)
+    cleanup_distributed()
 
 if __name__ == "__main__":
     test_dmoe()

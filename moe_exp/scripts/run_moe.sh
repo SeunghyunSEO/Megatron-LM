@@ -29,11 +29,20 @@ PP=${16:-2}
 VPP=${17:-"none"}
 EP=${18:-2}
 
-# LOG_INTERVAL=${19:-1}
-LOG_INTERVAL=${19:-20}
-SAVE_INTERVAL=${20:-10000}
-EVAL_INTERVAL=${21:-1000}
-EVAL_ITERS=${22:-10}
+LR=${19:-0.0006}
+MIN_LR=${20:-0.00006}
+
+MBSZ=${21:-1}
+GBSZ=${22:-16}
+
+TRAIN_ITERS=${23:-50000}
+WARMUP_ITERS=${24:-2000}
+DECAY_ITERS=${25:-48000}
+
+LOG_INTERVAL=${26:-20}
+SAVE_INTERVAL=${27:-1000000}
+EVAL_INTERVAL=${28:-1000}
+EVAL_ITERS=${29:-10}
 
 WANDB_API_KEY=${oc.env:WANDB_API_KEY}
 WANDB_PROJECT=${oc.env:WANDB_PROJECT}
@@ -50,6 +59,7 @@ DISTRIBUTED_ARGS=(
     --master_port $MASTER_PORT
 )
 echo "DISTRIBUTED_ARGS: ${DISTRIBUTED_ARGS[@]}"
+echo ""
 
 ## model configs
 MODEL_ARGS=(
@@ -58,11 +68,13 @@ MODEL_ARGS=(
     --max-position-embeddings 2048
     --position-embedding-type rope
     --rotary-base 100000
-    --num-layers 32
+    # --num-layers 32
+    --num-layers 24
     --hidden-size 512
     --num-attention-heads 4
     --group-query-attention
-    --num-query-groups 2
+    --num-query-groups 1
+    # --num-query-groups 2 # for testing TP
     --ffn-hidden-size 1792
     --swiglu
     --normalization RMSNorm
@@ -73,30 +85,35 @@ MODEL_ARGS=(
     --hidden-dropout 0.0
 )
 echo "MODEL_ARGS: ${MODEL_ARGS[@]}"
+echo ""
 
 ## moe model configs
-if [ $USE_MOE = true ]; then
+if [ "$USE_MOE" = true ]; then
     MOE_ARGS=(
-        --num-experts ${NUM_EXPERTS}
-        --moe-router-topk ${TOPK}
+        --num-experts "${NUM_EXPERTS}"
+        --moe-router-topk "${TOPK}"
         --moe-router-load-balancing-type aux_loss # options: aux_loss, sinkhorn, None. Default is aux_loss.
         --moe-aux-loss-coeff 1e-2
         --moe-token-dispatcher-type alltoall
     )
-    if [ $MOE_TYPE = "moe" ]; then
+    if [ "$TOPK" = "1" ]; then
+        MOE_ARGS+=(--moe-router-pre-softmax)
+    fi
+    if [ "$MOE_TYPE" = "moe" ]; then
         MOE_ARGS+=(
             --moe-expert-capacity-factor 1.0
             --moe-pad-expert-input-to-capacity # Optional
         )
-    elif [ $MOE_TYPE = "dmoe" ]; then
+    elif [ "$MOE_TYPE" = "dmoe" ]; then
         MOE_ARGS+=(--moe-grouped-gemm)
-    elif [ $MOE_TYPE = "mb_dmoe" ]; then
+    elif [ "$MOE_TYPE" = "mb_dmoe" ]; then
         MOE_ARGS+=(--moe-use-megablocks-dmoe)
     fi
-    echo "MOE_ARGS: ${MOE_ARGS[@]}"
 else
     MOE_ARGS=()
 fi
+echo "MOE_ARGS: ${MOE_ARGS[@]}"
+echo ""
 
 ## distributed training configs
 MODEL_PARALLEL_ARGS=(
@@ -105,6 +122,7 @@ MODEL_PARALLEL_ARGS=(
     --expert-model-parallel-size ${EP}
     --sequence-parallel
     --use-distributed-optimizer
+    # --no-async-tensor-model-parallel-allreduce false
 )
 if [ $VPP != "none" ]; then
     MODEL_PARALLEL_ARGS+=(--num-layers-per-virtual-pipeline-stage ${VPP})
@@ -132,36 +150,53 @@ else
     fi
 fi
 echo "DATA_ARGS: ${DATA_ARGS[@]}"
+echo ""
 
 ## hparams
 TRAINING_ARGS=(
-    --micro-batch-size 1
-    --global-batch-size 16
-    --train-iters 50000
-    --lr-decay-iters 48000
-    --lr-warmup-iters 2000
-    --lr 3e-4
-    --min-lr 3e-5
+    --micro-batch-size ${MBSZ}
+    --global-batch-size ${GBSZ}
+    --train-iters ${TRAIN_ITERS}
+    --lr-decay-iters ${DECAY_ITERS}
+    --lr-warmup-iters ${WARMUP_ITERS}
+    --lr $LR
+    --min-lr $MIN_LR
     --lr-decay-style cosine
     --weight-decay 0.1
     --clip-grad 1.0
     --bf16
+    --use-flash-attn
+    # --fp32-residual-connection
+    # --attention-softmax-in-fp32
+    --accumulate-allreduce-grads-in-fp32
     --overlap-grad-reduce
     --overlap-param-gather
     --no-gradient-accumulation-fusion # apex version issue
 )
 echo "TRAINING_ARGS: ${TRAINING_ARGS[@]}"
+echo ""
+
+## saving arguments
+SAVING_ARGS=(
+    --save $CHECKPOINT_PATH
+    --load $CHECKPOINT_PATH
+    --save-interval ${SAVE_INTERVAL}
+    # --use-dist-ckpt
+    # --auto-detect-ckpt-format
+    # --dist-ckpt-format zarr
+    # --ckpt-fully-parallel-save
+    # --use-checkpoint-opt_param-scheduler
+)
+echo "SAVING_ARGS: ${SAVING_ARGS[@]}"
+echo ""
 
 ## logger arguments
 LOGGING_ARGS=(
-    --save $CHECKPOINT_PATH
-    --load $CHECKPOINT_PATH
     --log-interval ${LOG_INTERVAL}
     --log-throughput
     --log-params-norm
     --log-num-zeros-in-grad
     --log-progress
-    --save-interval ${SAVE_INTERVAL}
     --eval-interval ${EVAL_INTERVAL}
     --eval-iters ${EVAL_ITERS}
     --tensorboard-dir "${CHECKPOINT_PATH}/tensorboard"
@@ -174,7 +209,6 @@ LOGGING_ARGS=(
     --no-load-optim
     --no-load-rng
 )
-
 if [ -n "${WANDB_API_KEY}" ]; then
     LOGGING_ARGS+=(
         --wandb-project ${WANDB_PROJECT:-"megatron"}
@@ -182,6 +216,7 @@ if [ -n "${WANDB_API_KEY}" ]; then
     )
 fi
 echo "LOGGING_ARGS: ${LOGGING_ARGS[@]}"
+echo ""
 
 ## run
 torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
@@ -190,4 +225,5 @@ torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
     ${DATA_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \
+    ${SAVING_ARGS[@]} \
     ${LOGGING_ARGS[@]}

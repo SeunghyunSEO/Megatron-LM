@@ -1919,7 +1919,7 @@ def _add_moe_args(parser):
     group.add_argument('--moe-use-upcycling', action='store_true',
                        help='Load a checkpoint of a dense model, convert it into an MoE model, and save the converted model to the path specified by --save. '
                        'Upcycling is implemented on the top of distributed checkpointing, so it supports parallel modes different from the dense model.')
-
+    # group.add_argument('--use-mb-dmoe')
     return parser
 
 def _add_mla_args(parser):

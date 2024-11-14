@@ -69,7 +69,7 @@ def get_gpt_layer_with_transformer_engine_spec(
         ModuleSpec: Module specification with TE modules
     """
     mlp = _get_mlp_module_spec(
-        use_te=True, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm, fp8=fp8
+        use_te=True, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm, fp8=fp8,
     )
 
     if multi_latent_attention:
@@ -141,7 +141,7 @@ def get_gpt_layer_local_spec(
         ModuleSpec: Module specification with Megatron-Core modules
     """
     mlp = _get_mlp_module_spec(
-        use_te=False, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm
+        use_te=False, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm,
     )
     if multi_latent_attention:
         return ModuleSpec(
@@ -204,6 +204,7 @@ def _get_mlp_module_spec(
     fp8: Optional[str] = None,
 ) -> ModuleSpec:
     """Helper function to get module spec for MLP/MoE"""
+    
     if num_experts is None:
         # Dense MLP w/ or w/o TE modules.
         return ModuleSpec(
@@ -214,34 +215,40 @@ def _get_mlp_module_spec(
             ),
         )
     else:
-        # Mixture of experts with modules in megatron core.
-        if use_te and moe_grouped_gemm:
-            linear_fc1 = TEColumnParallelGroupedLinear
-            linear_fc2 = TERowParallelGroupedLinear
-        elif use_te and fp8:
-            linear_fc1 = TEColumnParallelLinear
-            linear_fc2 = TERowParallelLinear
-        else:
-            linear_fc1 = ColumnParallelLinear
-            linear_fc2 = RowParallelLinear
+        # if use_mb_dmoe:
+        #     from megatron.core.transformer.moe.moe_layer import dMoELayer
+        #     return ModuleSpec(
+        #         module=dMoELayer 
+        #     )
 
-        use_te_grouped_gemm = use_te and TEColumnParallelGroupedLinear is not None
+        # # Mixture of experts with modules in megatron core.
+        # if use_te and moe_grouped_gemm:
+        #     linear_fc1 = TEColumnParallelGroupedLinear
+        #     linear_fc2 = TERowParallelGroupedLinear
+        # elif use_te and fp8:
+        #     linear_fc1 = TEColumnParallelLinear
+        #     linear_fc2 = TERowParallelLinear
+        # else:
+        #     linear_fc1 = ColumnParallelLinear
+        #     linear_fc2 = RowParallelLinear
 
-        return ModuleSpec(
-            module=MoELayer,
-            submodules=MoESubmodules(
-                experts=(
-                    MLPSubmodules(linear_fc1=linear_fc1, linear_fc2=linear_fc2)
-                    if not moe_grouped_gemm or use_te_grouped_gemm
-                    else None
-                ),
-                shared_experts=ModuleSpec(
-                    module=SharedExpertMLP,
-                    params={"gate": False},
-                    submodules=MLPSubmodules(
-                        linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
-                        linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
-                    ),
-                ),
-            ),
-        )
+        # use_te_grouped_gemm = use_te and TEColumnParallelGroupedLinear is not None
+
+        # return ModuleSpec(
+        #     module=MoELayer,
+        #     submodules=MoESubmodules(
+        #         experts=(
+        #             MLPSubmodules(linear_fc1=linear_fc1, linear_fc2=linear_fc2)
+        #             if not moe_grouped_gemm or use_te_grouped_gemm
+        #             else None
+        #         ),
+        #         shared_experts=ModuleSpec(
+        #             module=SharedExpertMLP,
+        #             params={"gate": False},
+        #             submodules=MLPSubmodules(
+        #                 linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
+        #                 linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
+        #             ),
+        #         ),
+        #     ),
+        # )

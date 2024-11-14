@@ -73,9 +73,13 @@ def model_provider(pre_process=True, post_process=True) -> Union[GPTModel, megat
             transformer_layer_spec = import_module(args.spec)
         else:
             if use_te:
-                transformer_layer_spec = get_gpt_layer_with_transformer_engine_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm, args.multi_latent_attention, args.fp8)
+                transformer_layer_spec = get_gpt_layer_with_transformer_engine_spec(
+                    args.num_experts, args.moe_grouped_gemm, args.qk_layernorm, args.multi_latent_attention, args.fp8, args.moe_use_megablocks_dmoe
+                )
             else:
-                transformer_layer_spec = get_gpt_layer_local_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm, args.multi_latent_attention)
+                transformer_layer_spec = get_gpt_layer_local_spec(
+                    args.num_experts, args.moe_grouped_gemm, args.qk_layernorm, args.multi_latent_attention, args.moe_use_megablocks_dmoe
+                )
 
         build_model_context = nullcontext
         build_model_context_args = {}
@@ -159,6 +163,22 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
             f'Device: {torch.cuda.current_device()}, node: {os.uname()[1]}'
         )
 
+    # if args.moe_num_experts:
+    #     from megatron.transformer.moe import megablocks_utils
+    #     megablocks_utils.assert_megablocks_is_available()
+    #     assert args.recompute_granularity == None, "disable act ckpt (we already use flash attn)"
+    #     megablocks_args = megablocks_utils.arguments.from_megatron(args)
+    #     lbl = megablocks_utils.moe.batched_load_balancing_loss(megablocks_args)
+    #     megablocks_utils.moe.clear_load_balancing_loss()
+
+    #     # Average the load balancing loss across data parallel replicas and save for logging.
+    #     averaged_lbl = average_losses_across_data_parallel_group([lbl])
+    #     loss_dict['load balancing loss'] = averaged_lbl[0]
+
+    #     # Compute the total loss, if necessary.
+    #     total_loss = loss + lbl if loss is not None else lbl
+    #     return total_loss, loss_dict
+
     # Reduce loss for logging.
     reporting_loss = loss.clone().detach()
     torch.distributed.all_reduce(reporting_loss, group=mpu.get_data_parallel_group())
@@ -169,7 +189,6 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
         local_num_tokens,
         {'lm loss': (reporting_loss[0], reporting_loss[1])},
     )
-
 
 def forward_step(data_iterator, model: GPTModel):
     """Forward training step.
@@ -188,6 +207,14 @@ def forward_step(data_iterator, model: GPTModel):
         tokens, labels, loss_mask, attention_mask, position_ids = get_batch(
             data_iterator)
     timers('batch-generator').stop()
+
+    # ## for debugging
+    # # https://github.com/NVIDIA/Megatron-LM/blob/345b1022b80e9653e66ae5bf95a9b3347c72b6a2/megatron/training/tokenizer/tokenizer.py#L131
+    # tokenizer = get_tokenizer()
+    # B, T = tokens.shape
+    # for i in range(B):
+    #     detokens = tokenizer.detokenize([t for t in tokens.cpu().numpy()[i]])
+    #     print(f'detokens: {detokens}')
 
     with stimer:
         output_tensor = model(tokens, position_ids, attention_mask,

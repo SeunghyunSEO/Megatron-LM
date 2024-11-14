@@ -21,6 +21,8 @@ class StrategyAction(Enum):
     SAVE_SHARDED = 'save_sharded'
 
 
+# from typing import Dict, Tuple
+# default_strategies: DefaultDict[str, Dict[Tuple, Any]] = defaultdict(dict)
 default_strategies: DefaultDict[str, dict[tuple, Any]] = defaultdict(dict)
 
 async_calls = AsyncCallsQueue()

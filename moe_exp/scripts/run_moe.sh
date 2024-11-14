@@ -95,6 +95,7 @@ if [ "$USE_MOE" = true ]; then
         --moe-router-load-balancing-type aux_loss # options: aux_loss, sinkhorn, None. Default is aux_loss.
         --moe-aux-loss-coeff 1e-2
         --moe-token-dispatcher-type alltoall
+        --moe-per-layer-logging
     )
     if [ "$TOPK" = "1" ]; then
         MOE_ARGS+=(--moe-router-pre-softmax)

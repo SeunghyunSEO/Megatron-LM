@@ -334,6 +334,44 @@ python tools/preprocess_data.py \
 
 ## run scripts for megatron
 
+target comparison
+
+```
+## dense
+Number of parameters in transformer layers in billions:  0.08
+Number of parameters in embedding layers in billions: 0.13
+Total number of parameters in billions: 0.21
+
+## moe
+Number of parameters in transformer layers in billions:  4.24
+Number of parameters in embedding layers in billions: 0.13
+Total number of parameters in billions: 4.37
+```
+
+```
+MODEL_ARGS=(
+    --disable-bias-linear
+    --seq-length 2048
+    --max-position-embeddings 2048
+    --position-embedding-type rope
+    --rotary-base 100000
+    --num-layers 24
+    --hidden-size 512
+    --num-attention-heads 4
+    --group-query-attention
+    --num-query-groups 1
+    --ffn-hidden-size 1792
+    --swiglu
+    --normalization RMSNorm
+    --init-method-std 0.02
+    --untie-embeddings-and-output-weights
+    --attention-dropout 0.0
+    --hidden-dropout 0.0
+)
+```
+
+- [tmp](https://github.com/NVIDIA/Megatron-LM/blob/345b1022b80e9653e66ae5bf95a9b3347c72b6a2/megatron/training/theoretical_memory_usage.py#L57)
+
 ### dense baseline
 
 ```bash

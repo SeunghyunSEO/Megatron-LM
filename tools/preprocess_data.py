@@ -147,6 +147,7 @@ class Partition(object):
         input_file_name, output_prefix = file_name
         print("Opening", input_file_name)
         fin = open(input_file_name, 'r', encoding='utf-8')
+        print(f'self.args: {self.args}')
 
         startup_start = time.time()
         encoder = Encoder(self.args)
@@ -203,7 +204,7 @@ def get_args():
                        choices=['BertWordPieceLowerCase','BertWordPieceCase',
                                 'GPT2BPETokenizer', 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer', 'Llama2Tokenizer',
-                                'Llama3Tokenizer', 'MistralTokenizer', 'NullTokenizer'],
+                                'Llama3Tokenizer', 'MistralTokenizer', 'NullTokenizer', 'HuggingFaceTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='YTTM tokenizer model.')

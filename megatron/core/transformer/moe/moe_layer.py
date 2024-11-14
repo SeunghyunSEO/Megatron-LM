@@ -162,3 +162,52 @@ class MoELayer(BaseMoELayer):
             output, mlp_bias = custom_forward(hidden_states)
 
         return output, mlp_bias
+
+
+# from functools import partial
+# from megatron.core.transformer.moe import megablocks_utils
+
+# class dMoELayer(BaseMoELayer):
+#     def __init__(
+#         self, 
+#         config: TransformerConfig, 
+#         layer_number: int = None
+#     ):
+#         megablocks_utils.assert_megablocks_is_available()
+#         super(dMoELayer, self).__init__(config=config, layer_number=layer_number)
+#         # assert self.config.moe_layer_recompute, 'IDGAF'
+#         # assert self.config.moe_token_dispatcher_type == "allgather", 'IDGAF'
+#         # assert not self.config.moe_shared_expert_intermediate_size
+#         # assert not self.config.moe_shared_expert_overlap
+
+#         args = {
+#             'hidden_size': self.config.hidden_size,
+#             'ffn_hidden_size': self.config.ffn_hidden_size,
+#             'moe_top_k': self.config.moe_router_topk,
+#             'activation_fn': self.config.activation_func,
+#             'moe_jitter_eps': self.config.moe_input_jitter_eps,  # Disable randomiztion
+#             'moe_normalize_expert_weights': 1.0,
+#             'uniform_expert_assignment': False,
+#             'bias': False,
+#             'device': torch.cuda.current_device(),
+#             'moe_num_experts': self.config.num_moe_experts,
+#             'mlp_type': 'glu',
+#             'fp16': config.fp16,
+#             'bf16': config.bf16,
+#             'init_method': partial(torch.nn.init.normal_, mean=0.0, std=0.02),
+#         }
+#         if self.expert_parallel_size > 1:
+#             ep_args = {
+#                 'moe_expert_model_parallelism': True,
+#                 'expert_parallel_group': parallel_state.get_expert_model_parallel_group(),
+#             }
+#             args.update(ep_args)
+#         args = megablocks_utils.arguments(**args,)
+#         self.dmoe = megablocks_utils.dmoe(args)
+#         self.router = self.dmoe.router
+
+#     def forward(self, hidden_states: torch.Tensor):
+#         return self.dmoe.forward(hidden_states)
+    
+#     def set_layer_number(self, layer_number: int):
+#         return

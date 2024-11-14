@@ -120,7 +120,7 @@ def get_nccl_options(pg_name, nccl_comm_cfgs):
 def generate_masked_orthogonal_rank_groups(
     world_size: int, parallel_size: List[int], mask: List[bool]
 ) -> List[List[int]]:
-    """Generate orthogonal parallel groups based on the parallel size and mask.
+    r"""Generate orthogonal parallel groups based on the parallel size and mask.
 
     Arguments:
         world_size (int): world size
@@ -1285,6 +1285,12 @@ def is_inside_decoder(rank=None):
     return False
 
 
+def get_pipeline_model_parallel_decoder_start() -> Optional[int]:
+    """Return decoder start rank (if encoder pipeline parallelism is set)."""
+    global _PIPELINE_MODEL_PARALLEL_DECODER_START
+    return _PIPELINE_MODEL_PARALLEL_DECODER_START
+
+
 def is_pipeline_stage_at_split():
     """Return true if pipeline stage executes decoder block and next
     stage executes encoder block for a model with both encoder and
@@ -1560,6 +1566,9 @@ def destroy_model_parallel():
 
     global _PIPELINE_MODEL_PARALLEL_GROUP
     _PIPELINE_MODEL_PARALLEL_GROUP = None
+
+    global _PIPELINE_MODEL_PARALLEL_DECODER_START
+    _PIPELINE_MODEL_PARALLEL_DECODER_START = None
 
     global _DATA_PARALLEL_GROUP
     _DATA_PARALLEL_GROUP = None

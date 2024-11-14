@@ -23,7 +23,11 @@ functional:clean_docker_node:
 
 functional:build_image:
   extends: [test:build_image, .functional_tests_rules]
-  needs: [test:build_image]
+  needs: 
+    - test:build_image
+    - test:docs_build
+    - test:formatting
+    - test:copyright
   variables:
     STAGE: jet
 
@@ -43,6 +47,7 @@ functional:configure:
       H100_CLUSTER=$([[ "$FUNCTIONAL_TEST_CLUSTER_H100" != "" ]] && echo $FUNCTIONAL_TEST_CLUSTER_H100 || echo $DEFAULT_H100_CLUSTER)
     - |
       if [[ "$FUNCTIONAL_TEST_SCOPE" == "release" || "$FUNCTIONAL_TEST_SCOPE" == "pre-release" ]]; then
+        FUNCTIONAL_TEST_NAME=$(eval echo $FUNCTIONAL_TEST_NAME)
         RELEASE_ARGS=(
           "--run-name"
           $FUNCTIONAL_TEST_NAME
@@ -57,6 +62,9 @@ functional:configure:
       python tests/functional_tests/python_test_utils/jet/generate_jet_trigger_job.py \
         --scope $FUNCTIONAL_TEST_SCOPE \
         --environment dev \
+        --n-repeat "$FUNCTIONAL_TEST_REPEAT" \
+        --time-limit "$FUNCTIONAL_TEST_TIME_LIMIT" \
+        --test-cases $FUNCTIONAL_TEST_CASES \
         --a100-cluster $A100_CLUSTER \
         --h100-cluster $H100_CLUSTER \
         --container-image ${CI_MCORE_LTS_IMAGE} \
@@ -68,6 +76,9 @@ functional:configure:
       python tests/functional_tests/python_test_utils/jet/generate_jet_trigger_job.py \
         --scope $FUNCTIONAL_TEST_SCOPE \
         --environment lts \
+        --n-repeat "$FUNCTIONAL_TEST_REPEAT" \
+        --time-limit "$FUNCTIONAL_TEST_TIME_LIMIT" \
+        --test-cases $FUNCTIONAL_TEST_CASES \
         --a100-cluster $A100_CLUSTER \
         --h100-cluster $H100_CLUSTER \
         --container-image ${CI_MCORE_LTS_IMAGE} \

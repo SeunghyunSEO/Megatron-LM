@@ -9,3 +9,7 @@ logs
 .vscode
 local/
 .gitmodules
+moe_exp/data
+moe_exp/scripts/README.md
+moe_exp/scripts/gitauthor.sh
+moe_exp/scripts/run_moe_from_scratch.sh
